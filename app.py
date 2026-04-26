@@ -17,10 +17,21 @@ def clean_text(text):
     return text
 
 # ===============================
-# RULE-BASED EMOTION (EXPLICIT)
+# RULE-BASED EMOTION (WITH CONTEXT GUARD ✅)
 # ===============================
 def rule_based_emotion(text):
-    happy_words = ["خوش", "خوشی", "مسرت", "شاد", "محبت", "مسکراہٹ", "خوشگوار", "خوشحال"]
+    # ✅ factual / weather / routine → NOT emotion
+    neutral_context = [
+        "موسم", "بارش", "سردی", "گرمی", "دھوپ", "بادل",
+        "آج", "کل", "صبح", "شام", "رات",
+        "دفتر", "کام", "سفر"
+    ]
+
+    if any(w in text for w in neutral_context):
+        return None
+
+    # ✅ explicit emotion words
+    happy_words = ["خوش", "خوشی", "مسرت", "شاد", "محبت", "مسکراہٹ", "خوشحال"]
     sad_words = ["اداس", "غم", "دکھ", "مایوس", "افسوس", "تنہا", "بوجھ", "دل بھاری"]
     angry_words = ["غصہ", "غضب", "ناراض", "نفرت", "جھگڑا"]
     fear_words = ["ڈر", "خوف", "دہشت", "گھبراہٹ", "خطرہ", "سانس لینا مشکل"]
@@ -48,7 +59,7 @@ def split_sentences(text):
 st.title("💬 Urdu Emotion Detection App")
 st.write("Enter Urdu sentence or paragraph:")
 
-text = st.text_area("Input Urdu Text", height=150)
+text = st.text_area("Input Urdu Text", height=160)
 
 if st.button("Predict Emotion"):
     if text.strip() == "":
@@ -81,7 +92,7 @@ if st.button("Predict Emotion"):
                 best_emotion = max(emotion_scores, key=emotion_scores.get)
                 best_emotion_prob = emotion_scores[best_emotion]
 
-                # ✅ FINAL DECISION
+                # ✅ FINAL DECISION RULE
                 if best_emotion_prob > 0.20:
                     pred = best_emotion
                     confidence = best_emotion_prob * 100
@@ -98,6 +109,7 @@ if st.button("Predict Emotion"):
 st.markdown("### Examples:")
 st.code("""
 آج بارش ہو رہی ہے۔
+آج صبح موسم خوشگوار تھا اور بارش ہو رہی تھی۔
 دل میں ایک عجیب سا بوجھ محسوس ہو رہا تھا۔
 سانس لینا مشکل لگ رہا تھا۔
 میں بہت خوش ہوں۔
