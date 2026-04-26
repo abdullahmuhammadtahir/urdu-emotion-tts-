@@ -17,59 +17,49 @@ def clean_text(text):
     return text
 
 # ===============================
-# HUMAN EMOTIONAL EXPERIENCE
+# EMOTIONAL INTENT DETECTION
 # ===============================
-def has_emotional_experience(text):
+def emotional_intent(text):
     """
-    True if the sentence expresses a human internal / abstract emotional state.
+    Returns:
+    - 'none'       → factual / routine
+    - 'explicit'   → clear emotion
+    - 'implicit'   → abstract / weak emotion
     """
-    # Strong internal emotional markers
-    internal_markers = [
-        "دل", "محسوس", "بوجھ", "اداس", "غم",
-        "غصہ", "خوف", "گھبرا", "پریشان",
-        "سانس لینا مشکل", "دل بھاری"
+
+    explicit_patterns = [
+        "دل خوش", "خوش ہو گیا", "مسکراہٹ",
+        "مجھے غصہ", "غصہ آ گیا",
+        "اداس ہو گیا", "غمگین",
+        "سانس لینا مشکل", "ڈر لگ رہا"
     ]
 
-    # Abstract / philosophical emotional judgments
-    abstract_subjects = ["زندگی", "دنیا", "وقت", "حالات"]
-    positive_eval = ["خوبصورت", "اچھا", "بہتر", "قیمتی"]
-    negative_eval = ["مشکل", "خراب", "بے معنی"]
+    implicit_patterns = [
+        "دل میں", "محسوس", "بوجھ",
+        "زندگی", "دنیا", "وقت",
+        "خوبصورت", "اچھا", "برا"
+    ]
 
-    if any(m in text for m in internal_markers):
-        return True
+    if any(p in text for p in explicit_patterns):
+        return "explicit"
 
-    if any(a in text for a in abstract_subjects) and (
-        any(p in text for p in positive_eval) or any(n in text for n in negative_eval)
-    ):
-        return True
+    if any(p in text for p in implicit_patterns):
+        return "implicit"
 
-    return False
+    return "none"
 
 # ===============================
-# EXPLICIT HUMAN EMOTION RULES
+# EXPLICIT EMOTION RULES
 # ===============================
 def explicit_emotion(text):
-    # Strong physiological fear
     if "سانس لینا مشکل" in text:
         return "fear"
-
-    happy_patterns = [
-        "دل خوش", "خوش ہو گیا", "خوش ہوگیا",
-        "مسکراہٹ", "محبت"
-    ]
-    sad_patterns = ["اداس", "غم", "دکھ", "مایوس", "بوجھ", "دل بھاری"]
-    angry_patterns = ["غصہ", "غضب", "ناراض"]
-    fear_patterns = ["ڈر", "خوف", "دہشت", "گھبراہٹ"]
-
-    if any(p in text for p in happy_patterns):
-        return "happy"
-    if any(p in text for p in sad_patterns):
-        return "sad"
-    if any(p in text for p in angry_patterns):
+    if "غصہ" in text:
         return "angry"
-    if any(p in text for p in fear_patterns):
-        return "fear"
-
+    if "اداس" in text or "غم" in text:
+        return "sad"
+    if "دل خوش" in text or "خوش ہو گیا" in text or "مسکراہٹ" in text:
+        return "happy"
     return None
 
 # ===============================
@@ -93,24 +83,25 @@ if st.button("Predict Emotion"):
         cleaned = clean_text(text)
         sentences = split_sentences(cleaned)
 
-        st.markdown("### 🔍 Sentence-wise Emotion Analysis")
+        st.markdown("### 🔍 Sentence‑wise Emotion Analysis")
 
         for i, sent in enumerate(sentences, 1):
+            intent = emotional_intent(sent)
 
-            # ✅ 1. No emotional experience → neutral
-            if not has_emotional_experience(sent):
+            # ✅ Case 1: No emotion
+            if intent == "none":
                 st.success(f"{i}. {sent}")
                 st.info("Emotion: neutral | Confidence: 90%")
                 continue
 
-            # ✅ 2. Explicit emotion → 100%
-            rule = explicit_emotion(sent)
-            if rule:
+            # ✅ Case 2: Explicit emotion
+            if intent == "explicit":
+                emotion = explicit_emotion(sent)
                 st.success(f"{i}. {sent}")
-                st.info(f"Emotion: {rule} | Confidence: 100%")
+                st.info(f"Emotion: {emotion} | Confidence: 100%")
                 continue
 
-            # ✅ 3. Implicit / abstract emotion → ML best guess (exclude neutral)
+            # ✅ Case 3: Implicit / abstract emotion
             vec = vectorizer.transform([sent])
             probs = model.predict_proba(vec)[0]
             classes = model.classes_
@@ -133,7 +124,7 @@ st.markdown("### ✅ Test Paragraph")
 st.code("""
 آج صبح موسم خوشگوار تھا اور ہلکی بارش ہو رہی تھی۔
 میں دفتر گیا اور معمول کے مطابق کام کیا۔
-لیکن دن گزرتے گزرتے دل میں ایک عجیب سا بوجھ محسوس ہونے لگا۔
+دل میں ایک عجیب سا بوجھ محسوس ہونے لگا۔
 کمرے کی فضا غیر معمولی تھی اور سانس لینا مشکل لگ رہا تھا۔
 پھر اچانک دل خوش ہو گیا۔
 بعد میں مجھے بہت غصہ آ گیا۔
