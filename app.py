@@ -17,7 +17,7 @@ def clean_text(text):
     return text
 
 # ===============================
-# HUMAN EMOTIONAL EXPERIENCE CHECK ✅
+# HUMAN EMOTIONAL EXPERIENCE
 # ===============================
 def has_emotional_experience(text):
     markers = [
@@ -29,25 +29,24 @@ def has_emotional_experience(text):
     return any(m in text for m in markers)
 
 # ===============================
-# EXPLICIT RULE-BASED EMOTION
+# EXPLICIT EMOTION RULES
 # ===============================
-def rule_based_emotion(text):
-    # Priority fear condition
-    if "سانس لینا مشکل" in text or "سانس مشکل" in text:
+def explicit_emotion(text):
+    if "سانس لینا مشکل" in text:
         return "fear"
 
-    happy_words = ["خوش", "خوشی", "مسرت", "شاد", "محبت", "مسکراہٹ"]
-    sad_words = ["اداس", "غم", "دکھ", "مایوس", "افسوس", "تنہا", "بوجھ", "دل بھاری"]
-    angry_words = ["غصہ", "غضب", "ناراض", "نفرت", "جھگڑا"]
-    fear_words = ["ڈر", "خوف", "دہشت", "گھبراہٹ", "خطرہ"]
+    happy = ["دل خوش", "خوش ہو گیا", "مسکراہٹ", "محبت"]
+    sad = ["اداس", "غم", "دکھ", "مایوس", "بوجھ", "دل بھاری"]
+    angry = ["غصہ", "غضب", "ناراض"]
+    fear = ["ڈر", "خوف", "دہشت", "گھبراہٹ"]
 
-    if any(w in text for w in happy_words):
+    if any(w in text for w in happy):
         return "happy"
-    if any(w in text for w in sad_words):
+    if any(w in text for w in sad):
         return "sad"
-    if any(w in text for w in angry_words):
+    if any(w in text for w in angry):
         return "angry"
-    if any(w in text for w in fear_words):
+    if any(w in text for w in fear):
         return "fear"
 
     return None
@@ -64,10 +63,10 @@ def split_sentences(text):
 st.title("💬 Urdu Emotion Detection App")
 st.write("Enter Urdu sentence or paragraph:")
 
-text = st.text_area("Input Urdu Text", height=160)
+text = st.text_area("Input Urdu Text", height=170)
 
 if st.button("Predict Emotion"):
-    if text.strip() == "":
+    if not text.strip():
         st.warning("Please enter Urdu text.")
     else:
         cleaned = clean_text(text)
@@ -77,54 +76,45 @@ if st.button("Predict Emotion"):
 
         for i, sent in enumerate(sentences, 1):
 
-            # ✅ 1. No emotional experience → neutral
+            # 1️⃣ If NO human emotional experience → neutral
             if not has_emotional_experience(sent):
                 st.success(f"{i}. {sent}")
-                st.info("Emotion: neutral | Confidence: 100% (factual)")
+                st.info("Emotion: neutral | Confidence: 90%")
                 continue
 
-            # ✅ 2. Explicit emotion rules
-            rule_result = rule_based_emotion(sent)
-            if rule_result:
+            # 2️⃣ Explicit emotion → 100%
+            rule = explicit_emotion(sent)
+            if rule:
                 st.success(f"{i}. {sent}")
-                st.info(f"Emotion: {rule_result} | Confidence: 100% (rule-based)")
+                st.info(f"Emotion: {rule} | Confidence: 100%")
                 continue
 
-            # ✅ 3. ML fallback for implicit emotion
+            # 3️⃣ Implicit emotion → ML best guess (excluding neutral)
             vec = vectorizer.transform([sent])
             probs = model.predict_proba(vec)[0]
             classes = model.classes_
 
-            neutral_prob = probs[list(classes).index("neutral")]
-
             emotion_scores = {
-                cls: prob for cls, prob in zip(classes, probs) if cls != "neutral"
+                cls: prob for cls, prob in zip(classes, probs)
+                if cls != "neutral"
             }
 
-            best_emotion = max(emotion_scores, key=emotion_scores.get)
-            best_emotion_prob = emotion_scores[best_emotion]
-
-            # ✅ FINAL DECISION
-            if best_emotion_prob > 0.20:
-                pred = best_emotion
-                confidence = best_emotion_prob * 100
-            else:
-                pred = "neutral"
-                confidence = neutral_prob * 100
+            pred = max(emotion_scores, key=emotion_scores.get)
+            confidence = emotion_scores[pred] * 100
 
             st.success(f"{i}. {sent}")
             st.info(f"Emotion: {pred} | Confidence: {confidence:.2f}%")
 
 # ===============================
-# EXAMPLE TEST PARAGRAPH
+# TEST PARAGRAPH
 # ===============================
-st.markdown("### Example Paragraph:")
+st.markdown("### Example Test Paragraph")
 st.code("""
 آج صبح موسم خوشگوار تھا اور ہلکی بارش ہو رہی تھی۔
 میں دفتر گیا اور معمول کے مطابق کام کیا۔
 لیکن دن گزرتے گزرتے دل میں ایک عجیب سا بوجھ محسوس ہونے لگا۔
 کمرے کی فضا غیر معمولی تھی اور سانس لینا مشکل لگ رہا تھا۔
-پھر اچانک مجھے تمہاری باتیں یاد آئیں اور دل خوش ہو گیا۔
-بعد میں ایک بات پر مجھے بہت غصہ آ گیا۔
-آخر میں میں اس سب پر اداس ہو کر خاموش بیٹھ گیا۔
+پھر اچانک دل خوش ہو گیا۔
+بعد میں مجھے بہت غصہ آ گیا۔
+آخر میں میں اداس ہو کر خاموش بیٹھ گیا۔
 """)
