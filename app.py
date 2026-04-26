@@ -12,22 +12,31 @@ vectorizer = pickle.load(open("vectorizer.pkl", "rb"))
 # CLEAN TEXT (SAME AS TRAINING)
 # ===============================
 def clean_text(text):
-    text = re.sub(r'[^\u0600-\u06FF\s]', '', text)
+    text = re.sub(r'[^\u0600-\u06FF\s]', '', str(text))
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
 # ===============================
-# RULE-BASED EMOTION (GUARANTEED)
+# RULE-BASED EMOTION (IMPROVED ✅)
 # ===============================
 def rule_based_emotion(text):
-    if "خوش" in text:
+    happy_words = [
+        "خوش", "خوشی", "مسرت", "شاد", "محبت",
+        "مسکراہٹ", "خوشحال", "خوشگوار"
+    ]
+    sad_words = ["اداس", "غم", "دکھ", "مایوس", "افسوس", "تنہا"]
+    angry_words = ["غصہ", "غضب", "ناراض", "نفرت", "جھگڑا"]
+    fear_words = ["ڈر", "خوف", "دہشت", "گھبراہٹ", "خطرہ"]
+
+    if any(w in text for w in happy_words):
         return "happy"
-    if "اداس" in text or "غم" in text:
+    if any(w in text for w in sad_words):
         return "sad"
-    if "غصہ" in text or "ناراض" in text:
+    if any(w in text for w in angry_words):
         return "angry"
-    if "ڈر" in text or "خوف" in text:
+    if any(w in text for w in fear_words):
         return "fear"
+
     return None
 
 # ===============================
@@ -65,7 +74,9 @@ if st.button("Predict Emotion"):
 st.markdown("### Examples:")
 st.code("""
 میں بہت خوش ہوں
-مجھے غصہ آ رہا ہے
+تمہارے چہرے پر مسکراہٹ ہے
+مجھے تم سے محبت ہے
 وہ بہت اداس ہے
+مجھے غصہ آ رہا ہے
 مجھے خوف محسوس ہو رہا ہے
 """)
