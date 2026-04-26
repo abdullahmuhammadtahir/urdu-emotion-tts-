@@ -17,21 +17,22 @@ def clean_text(text):
     return text
 
 # ===============================
-# RULE-BASED EMOTION (WITH CONTEXT GUARD ✅)
+# HUMAN SUBJECT DETECTION ✅
+# ===============================
+def has_human_subject(text):
+    human_markers = [
+        "میں", "مجھے", "ہم", "ہمیں",
+        "دل", "اندر", "محسوس",
+        "لگا", "لگی", "لگ رہا", "لگ رہی",
+        "ہو گیا", "ہو گئی"
+    ]
+    return any(w in text for w in human_markers)
+
+# ===============================
+# EXPLICIT RULE-BASED EMOTION
 # ===============================
 def rule_based_emotion(text):
-    # ✅ factual / weather / routine → NOT emotion
-    neutral_context = [
-        "موسم", "بارش", "سردی", "گرمی", "دھوپ", "بادل",
-        "آج", "کل", "صبح", "شام", "رات",
-        "دفتر", "کام", "سفر"
-    ]
-
-    if any(w in text for w in neutral_context):
-        return None
-
-    # ✅ explicit emotion words
-    happy_words = ["خوش", "خوشی", "مسرت", "شاد", "محبت", "مسکراہٹ", "خوشحال"]
+    happy_words = ["خوش", "خوشی", "مسرت", "شاد", "محبت", "مسکراہٹ"]
     sad_words = ["اداس", "غم", "دکھ", "مایوس", "افسوس", "تنہا", "بوجھ", "دل بھاری"]
     angry_words = ["غصہ", "غضب", "ناراض", "نفرت", "جھگڑا"]
     fear_words = ["ڈر", "خوف", "دہشت", "گھبراہٹ", "خطرہ", "سانس لینا مشکل"]
@@ -71,47 +72,55 @@ if st.button("Predict Emotion"):
         st.markdown("### 🔍 Sentence-wise Emotion Analysis")
 
         for i, sent in enumerate(sentences, 1):
-            # 1️⃣ Rule-based first
-            rule_result = rule_based_emotion(sent)
 
+            # ✅ 1. Check if HUMAN emotion is even possible
+            if not has_human_subject(sent):
+                st.success(f"{i}. {sent}")
+                st.info("Emotion: neutral | Confidence: 100% (factual)")
+                continue
+
+            # ✅ 2. Rule-based explicit emotion
+            rule_result = rule_based_emotion(sent)
             if rule_result:
                 st.success(f"{i}. {sent}")
                 st.info(f"Emotion: {rule_result} | Confidence: 100% (rule-based)")
+                continue
+
+            # ✅ 3. ML fallback for implicit emotion
+            vec = vectorizer.transform([sent])
+            probs = model.predict_proba(vec)[0]
+            classes = model.classes_
+
+            neutral_prob = probs[list(classes).index("neutral")]
+
+            emotion_scores = {
+                cls: prob for cls, prob in zip(classes, probs) if cls != "neutral"
+            }
+
+            best_emotion = max(emotion_scores, key=emotion_scores.get)
+            best_emotion_prob = emotion_scores[best_emotion]
+
+            # ✅ FINAL DECISION
+            if best_emotion_prob > 0.20:
+                pred = best_emotion
+                confidence = best_emotion_prob * 100
             else:
-                # 2️⃣ ML fallback with controlled neutral
-                vec = vectorizer.transform([sent])
-                probs = model.predict_proba(vec)[0]
-                classes = model.classes_
+                pred = "neutral"
+                confidence = neutral_prob * 100
 
-                neutral_prob = probs[list(classes).index("neutral")]
-
-                emotion_scores = {
-                    cls: prob for cls, prob in zip(classes, probs) if cls != "neutral"
-                }
-
-                best_emotion = max(emotion_scores, key=emotion_scores.get)
-                best_emotion_prob = emotion_scores[best_emotion]
-
-                # ✅ FINAL DECISION RULE
-                if best_emotion_prob > 0.20:
-                    pred = best_emotion
-                    confidence = best_emotion_prob * 100
-                else:
-                    pred = "neutral"
-                    confidence = neutral_prob * 100
-
-                st.success(f"{i}. {sent}")
-                st.info(f"Emotion: {pred} | Confidence: {confidence:.2f}%")
+            st.success(f"{i}. {sent}")
+            st.info(f"Emotion: {pred} | Confidence: {confidence:.2f}%")
 
 # ===============================
 # EXAMPLES
 # ===============================
-st.markdown("### Examples:")
+st.markdown("### Example Paragraph:")
 st.code("""
-آج بارش ہو رہی ہے۔
-آج صبح موسم خوشگوار تھا اور بارش ہو رہی تھی۔
-دل میں ایک عجیب سا بوجھ محسوس ہو رہا تھا۔
-سانس لینا مشکل لگ رہا تھا۔
-میں بہت خوش ہوں۔
-مجھے غصہ آ رہا ہے۔
+آج صبح موسم خوشگوار تھا اور ہلکی بارش ہو رہی تھی۔
+میں دفتر گیا اور معمول کے مطابق کام کیا۔
+لیکن دن گزرتے گزرتے دل میں ایک عجیب سا بوجھ محسوس ہونے لگا۔
+کمرے کی فضا غیر معمولی تھی اور سانس لینا مشکل لگ رہا تھا۔
+پھر اچانک مجھے تمہاری باتیں یاد آئیں اور دل خوش ہو گیا۔
+بعد میں ایک بات پر مجھے بہت غصہ آ گیا۔
+آخر میں میں اس سب پر اداس ہو کر خاموش بیٹھ گیا۔
 """)
