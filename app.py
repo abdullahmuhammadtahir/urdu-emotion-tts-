@@ -17,35 +17,46 @@ def clean_text(text):
     return text
 
 # ===============================
-# HUMAN EMOTIONAL EXPERIENCE CHECK ✅
+# HUMAN EMOTIONAL EXPERIENCE
 # ===============================
 def has_emotional_experience(text):
     """
-    True only if sentence expresses an INTERNAL human state.
+    True if the sentence expresses a human internal / abstract emotional state.
     """
-    markers = [
-        "دل", "محسوس", "بوجھ",
-        "اداس", "غم",
+    # Strong internal emotional markers
+    internal_markers = [
+        "دل", "محسوس", "بوجھ", "اداس", "غم",
         "غصہ", "خوف", "گھبرا", "پریشان",
         "سانس لینا مشکل", "دل بھاری"
     ]
-    return any(m in text for m in markers)
+
+    # Abstract / philosophical emotional judgments
+    abstract_subjects = ["زندگی", "دنیا", "وقت", "حالات"]
+    positive_eval = ["خوبصورت", "اچھا", "بہتر", "قیمتی"]
+    negative_eval = ["مشکل", "خراب", "بے معنی"]
+
+    if any(m in text for m in internal_markers):
+        return True
+
+    if any(a in text for a in abstract_subjects) and (
+        any(p in text for p in positive_eval) or any(n in text for n in negative_eval)
+    ):
+        return True
+
+    return False
 
 # ===============================
-# EXPLICIT HUMAN EMOTION RULES ✅
-# (ONLY human emotion phrases, NOT descriptive words)
+# EXPLICIT HUMAN EMOTION RULES
 # ===============================
 def explicit_emotion(text):
-    # Fear has strongest priority
+    # Strong physiological fear
     if "سانس لینا مشکل" in text:
         return "fear"
 
-    # ✅ Happy only if HUMAN context
     happy_patterns = [
         "دل خوش", "خوش ہو گیا", "خوش ہوگیا",
-        "مسکراہٹ آئی", "محبت"
+        "مسکراہٹ", "محبت"
     ]
-
     sad_patterns = ["اداس", "غم", "دکھ", "مایوس", "بوجھ", "دل بھاری"]
     angry_patterns = ["غصہ", "غضب", "ناراض"]
     fear_patterns = ["ڈر", "خوف", "دہشت", "گھبراہٹ"]
@@ -86,20 +97,20 @@ if st.button("Predict Emotion"):
 
         for i, sent in enumerate(sentences, 1):
 
-            # ✅ 1. No human emotional experience → neutral
+            # ✅ 1. No emotional experience → neutral
             if not has_emotional_experience(sent):
                 st.success(f"{i}. {sent}")
                 st.info("Emotion: neutral | Confidence: 90%")
                 continue
 
-            # ✅ 2. Explicit human emotion → 100%
+            # ✅ 2. Explicit emotion → 100%
             rule = explicit_emotion(sent)
             if rule:
                 st.success(f"{i}. {sent}")
                 st.info(f"Emotion: {rule} | Confidence: 100%")
                 continue
 
-            # ✅ 3. Implicit emotion → ML best guess (exclude neutral)
+            # ✅ 3. Implicit / abstract emotion → ML best guess (exclude neutral)
             vec = vectorizer.transform([sent])
             probs = model.predict_proba(vec)[0]
             classes = model.classes_
@@ -127,4 +138,5 @@ st.code("""
 پھر اچانک دل خوش ہو گیا۔
 بعد میں مجھے بہت غصہ آ گیا۔
 آخر میں میں اداس ہو کر خاموش بیٹھ گیا۔
+زندگی خوبصورت ہے۔
 """)
