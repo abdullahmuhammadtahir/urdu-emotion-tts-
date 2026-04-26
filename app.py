@@ -17,13 +17,13 @@ def clean_text(text):
     return text
 
 # ===============================
-# RULE-BASED EMOTION (STRONG ✅)
+# RULE-BASED EMOTION (EXPLICIT)
 # ===============================
 def rule_based_emotion(text):
     happy_words = ["خوش", "خوشی", "مسرت", "شاد", "محبت", "مسکراہٹ", "خوشگوار", "خوشحال"]
-    sad_words = ["اداس", "غم", "دکھ", "مایوس", "افسوس", "تنہا"]
+    sad_words = ["اداس", "غم", "دکھ", "مایوس", "افسوس", "تنہا", "بوجھ", "دل بھاری"]
     angry_words = ["غصہ", "غضب", "ناراض", "نفرت", "جھگڑا"]
-    fear_words = ["ڈر", "خوف", "دہشت", "گھبراہٹ", "خطرہ"]
+    fear_words = ["ڈر", "خوف", "دہشت", "گھبراہٹ", "خطرہ", "سانس لینا مشکل"]
 
     if any(w in text for w in happy_words):
         return "happy"
@@ -33,21 +33,20 @@ def rule_based_emotion(text):
         return "angry"
     if any(w in text for w in fear_words):
         return "fear"
+
     return None
 
 # ===============================
-# SENTENCE SPLITTER (URDU)
+# SENTENCE SPLITTER
 # ===============================
 def split_sentences(text):
-    # Split on Urdu full stop "۔"
-    sentences = [s.strip() for s in text.split("۔") if s.strip()]
-    return sentences
+    return [s.strip() for s in text.split("۔") if s.strip()]
 
 # ===============================
 # STREAMLIT UI
 # ===============================
 st.title("💬 Urdu Emotion Detection App")
-st.write("Enter Urdu text (sentence or paragraph):")
+st.write("Enter Urdu sentence or paragraph:")
 
 text = st.text_area("Input Urdu Text", height=150)
 
@@ -61,17 +60,34 @@ if st.button("Predict Emotion"):
         st.markdown("### 🔍 Sentence-wise Emotion Analysis")
 
         for i, sent in enumerate(sentences, 1):
-            # Rule-based first
+            # 1️⃣ Rule-based first
             rule_result = rule_based_emotion(sent)
 
             if rule_result:
                 st.success(f"{i}. {sent}")
                 st.info(f"Emotion: {rule_result} | Confidence: 100% (rule-based)")
             else:
-                # ML fallback
+                # 2️⃣ ML fallback with controlled neutral
                 vec = vectorizer.transform([sent])
-                pred = model.predict(vec)[0]
-                confidence = max(model.predict_proba(vec)[0]) * 100
+                probs = model.predict_proba(vec)[0]
+                classes = model.classes_
+
+                neutral_prob = probs[list(classes).index("neutral")]
+
+                emotion_scores = {
+                    cls: prob for cls, prob in zip(classes, probs) if cls != "neutral"
+                }
+
+                best_emotion = max(emotion_scores, key=emotion_scores.get)
+                best_emotion_prob = emotion_scores[best_emotion]
+
+                # ✅ FINAL DECISION
+                if best_emotion_prob > 0.20:
+                    pred = best_emotion
+                    confidence = best_emotion_prob * 100
+                else:
+                    pred = "neutral"
+                    confidence = neutral_prob * 100
 
                 st.success(f"{i}. {sent}")
                 st.info(f"Emotion: {pred} | Confidence: {confidence:.2f}%")
@@ -81,9 +97,9 @@ if st.button("Predict Emotion"):
 # ===============================
 st.markdown("### Examples:")
 st.code("""
+آج بارش ہو رہی ہے۔
+دل میں ایک عجیب سا بوجھ محسوس ہو رہا تھا۔
+سانس لینا مشکل لگ رہا تھا۔
 میں بہت خوش ہوں۔
-تمہارے چہرے پر مسکراہٹ ہے۔
 مجھے غصہ آ رہا ہے۔
-مجھے خوف محسوس ہو رہا ہے۔
-وہ آج بہت اداس ہے۔
 """)
