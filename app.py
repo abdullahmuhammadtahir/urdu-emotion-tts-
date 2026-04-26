@@ -17,25 +17,29 @@ def clean_text(text):
     return text
 
 # ===============================
-# HUMAN SUBJECT DETECTION ✅
+# HUMAN EMOTIONAL EXPERIENCE CHECK ✅
 # ===============================
-def has_human_subject(text):
-    human_markers = [
-        "میں", "مجھے", "ہم", "ہمیں",
-        "دل", "اندر", "محسوس",
-        "لگا", "لگی", "لگ رہا", "لگ رہی",
-        "ہو گیا", "ہو گئی"
+def has_emotional_experience(text):
+    markers = [
+        "دل", "محسوس", "بوجھ", "خوش", "اداس", "غم",
+        "غصہ", "خوف", "گھبرا", "پریشان",
+        "سانس لینا مشکل", "دل بھاری",
+        "ہو گیا", "ہو گئی", "لگ رہا", "لگ رہی"
     ]
-    return any(w in text for w in human_markers)
+    return any(m in text for m in markers)
 
 # ===============================
 # EXPLICIT RULE-BASED EMOTION
 # ===============================
 def rule_based_emotion(text):
+    # Priority fear condition
+    if "سانس لینا مشکل" in text or "سانس مشکل" in text:
+        return "fear"
+
     happy_words = ["خوش", "خوشی", "مسرت", "شاد", "محبت", "مسکراہٹ"]
     sad_words = ["اداس", "غم", "دکھ", "مایوس", "افسوس", "تنہا", "بوجھ", "دل بھاری"]
     angry_words = ["غصہ", "غضب", "ناراض", "نفرت", "جھگڑا"]
-    fear_words = ["ڈر", "خوف", "دہشت", "گھبراہٹ", "خطرہ", "سانس لینا مشکل"]
+    fear_words = ["ڈر", "خوف", "دہشت", "گھبراہٹ", "خطرہ"]
 
     if any(w in text for w in happy_words):
         return "happy"
@@ -73,13 +77,13 @@ if st.button("Predict Emotion"):
 
         for i, sent in enumerate(sentences, 1):
 
-            # ✅ 1. Check if HUMAN emotion is even possible
-            if not has_human_subject(sent):
+            # ✅ 1. No emotional experience → neutral
+            if not has_emotional_experience(sent):
                 st.success(f"{i}. {sent}")
                 st.info("Emotion: neutral | Confidence: 100% (factual)")
                 continue
 
-            # ✅ 2. Rule-based explicit emotion
+            # ✅ 2. Explicit emotion rules
             rule_result = rule_based_emotion(sent)
             if rule_result:
                 st.success(f"{i}. {sent}")
@@ -112,7 +116,7 @@ if st.button("Predict Emotion"):
             st.info(f"Emotion: {pred} | Confidence: {confidence:.2f}%")
 
 # ===============================
-# EXAMPLES
+# EXAMPLE TEST PARAGRAPH
 # ===============================
 st.markdown("### Example Paragraph:")
 st.code("""
