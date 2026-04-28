@@ -12,29 +12,40 @@ vectorizer = pickle.load(open("vectorizer.pkl", "rb"))
 # CLEAN TEXT
 # ===============================
 def clean_text(text):
-    text = re.sub(r'[^\u0600-\u06FF\s۔]', '', str(text))
-    text = re.sub(r'\s+', ' ', text).strip()
+    text = re.sub(r"[^\u0600-\u06FF\s۔؟]", "", str(text))
+    text = re.sub(r"\s+", " ", text).strip()
     return text
 
 # ===============================
 # SENTENCE SPLITTER
 # ===============================
 def split_sentences(text):
-    return [s.strip() for s in text.split("۔") if s.strip()]
+    return [s.strip() for s in re.split("[۔؟]", text) if s.strip()]
 
 # ===============================
-# INTENT TYPE (3 STATES ONLY)
+# QUESTION DETECTION (INTENT ONLY)
+# ===============================
+def is_question(text):
+    return any(q in text for q in ["کیا", "کیوں", "کیسے", "کب", "کہاں", "؟"])
+
+# ===============================
+# INTENT TYPE
 # ===============================
 def intent_type(text):
     # factual / routine → no emotion
     if any(w in text for w in ["بارش", "دفتر", "کام", "موسم"]):
         return "factual"
 
-    # explicit emotion → certain
-    if any(w in text for w in ["دل خوش", "غصہ", "اداس"]):
+    # explicit emotion → certainty
+    if any(w in text for w in [
+        "دل خوش ہو گیا", "بہت خوش ہوں",
+        "مجھے غصہ آ گیا", "بہت غصے میں ہوں",
+        "میں اداس ہوں", "بہت غمگین ہوں",
+        "مجھے خوف آ رہا ہے", "میں ڈر گیا ہوں"
+    ]):
         return "explicit"
 
-    # everything else → implicit / abstract
+    # otherwise → implicit / abstract
     return "implicit"
 
 # ===============================
@@ -43,32 +54,49 @@ def intent_type(text):
 def explicit_emotion(text):
     if "غصہ" in text:
         return "angry"
-    if "اداس" in text:
+    if "اداس" in text or "غمگین" in text:
         return "sad"
-    if "دل خوش" in text:
+    if "دل خوش" in text or "خوش ہوں" in text:
         return "happy"
+    if "خوف" in text or "ڈر گیا" in text:
+        return "fear"
     return None
 
 # ===============================
-# ABSTRACT POLARITY (MINIMAL, CONCEPTUAL)
+# ABSTRACT POLARITY (IMPLICIT LOGIC)
 # ===============================
 def abstract_polarity(text):
-    """
-    Returns: 'positive', 'negative', or None
-    (Used ONLY for implicit/abstract cases)
-    """
-    positive_cues = ["خوبصورت", "اچھا", "بہتر", "مثبت"]
-    negative_cues = ["مشکل", "خراب", "بوجھ", "پریشان"]
+    # Fear / anxiety
+    fear = [
+        "خطرہ", "ڈر", "خوف", "گھبرا",
+        "پریشان", "سانس لینا مشکل", "بے چینی"
+    ]
 
-    threat_cues = ["سانس لینا مشکل", "خطرہ", "خوف", "گھبرا"]
+    # Sadness / loss
+    sad = [
+        "بوجھ", "مشکل", "اداس", "غم", "مایوس",
+        "اکیلا", "تنہا", "دل بھاری"
+    ]
 
-    if any(t in text for t in threat_cues):
+    # Anger / frustration
+    angry = [
+        "برداشت سے باہر", "بے انصافی",
+        "غصے میں", "چڑ"
+    ]
+
+    # Positive / optimism
+    happy = [
+        "مسکراہٹ", "خوبصورت", "اچھا",
+        "بہتر", "خوشی", "امید", "سکون"
+    ]
+
+    if any(w in text for w in fear):
         return "fear"
-
-    if any(n in text for n in negative_cues):
+    if any(w in text for w in angry):
+        return "angry"
+    if any(w in text for w in sad):
         return "sad"
-
-    if any(p in text for p in positive_cues):
+    if any(w in text for w in happy):
         return "happy"
 
     return None
@@ -79,7 +107,7 @@ def abstract_polarity(text):
 st.title("💬 Urdu Emotion Detection App")
 st.write("Enter Urdu sentence or paragraph:")
 
-text = st.text_area("Input Urdu Text", height=170)
+text = st.text_area("Input Urdu Text", height=160)
 
 if st.button("Predict Emotion"):
     cleaned = clean_text(text)
@@ -103,44 +131,22 @@ if st.button("Predict Emotion"):
             st.info(f"Emotion: {emo} | Confidence: 100%")
             continue
 
-        # 3️⃣ IMPLICIT / ABSTRACT
-        # First: abstract polarity (human‑aligned)
-        pol = abstract_polarity(sent)
-        if pol == "happy":
+        # 3️⃣ IMPLICIT OR QUESTION → SAME LOGIC
+        if intent == "implicit" or is_question(sent):
+            pol = abstract_polarity(sent)
+            if pol:
+                st.success(f"{i}. {sent}")
+                st.info(f"Emotion: {pol} | Confidence: 30%")
+                continue
+
+            # ML fallback (neutral excluded)
+            vec = vectorizer.transform([sent])
+            probs = model.predict_proba(vec)[0]
+            classes = model.classes_
+
+            scores = {c: p for c, p in zip(classes, probs) if c != "neutral"}
+            pred = max(scores, key=scores.get)
+
             st.success(f"{i}. {sent}")
-            st.info("Emotion: happy | Confidence: 30%")
+            st.info(f"Emotion: {pred} | Confidence: 25%")
             continue
-        if pol == "sad":
-            st.success(f"{i}. {sent}")
-            st.info("Emotion: sad | Confidence: 30%")
-            continue
-        if pol == "fear":
-            st.success(f"{i}. {sent}")
-            st.info("Emotion: fear | Confidence: 30%")
-            continue
-
-        # Fallback: ML best‑guess (neutral excluded), low confidence
-        vec = vectorizer.transform([sent])
-        probs = model.predict_proba(vec)[0]
-        classes = model.classes_
-
-        scores = {c: p for c, p in zip(classes, probs) if c != "neutral"}
-        pred = max(scores, key=scores.get)
-
-        st.success(f"{i}. {sent}")
-        st.info(f"Emotion: {pred} | Confidence: 25%")
-
-# ===============================
-# TEST PARAGRAPH
-# ===============================
-st.markdown("### ✅ Test Paragraph")
-st.code("""
-آج صبح موسم خوشگوار تھا اور ہلکی بارش ہو رہی تھی۔
-میں دفتر گیا اور معمول کے مطابق کام کیا۔
-دل میں ایک عجیب سا بوجھ محسوس ہونے لگا۔
-کمرے کی فضا غیر معمولی تھی اور سانس لینا مشکل لگ رہا تھا۔
-پھر اچانک دل خوش ہو گیا۔
-بعد میں مجھے بہت غصہ آ گیا۔
-آخر میں میں اداس ہو کر خاموش بیٹھ گیا۔
-زندگی خوبصورت ہے۔
-""")
